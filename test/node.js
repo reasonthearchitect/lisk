@@ -28,6 +28,9 @@ node.chai.use(require('chai-bignumber')(node.bignum));
 node.lisk = require('lisk-js');
 node.supertest = require('supertest');
 var randomString = require('randomstring');
+
+var jobsQueue = require('../helpers/jobsQueue.js');
+
 require('colors');
 
 // Node configuration
@@ -344,6 +347,7 @@ node.randomPassword = function () {
 
 // Init whole application inside tests
 node.initApplication = function (cb, db) {
+	jobsQueue.jobs = {};
 	var modules = [], rewiredModules = {};
 	// Init dummy connection with database - valid, used for tests here
 	var options = {
@@ -418,8 +422,7 @@ node.initApplication = function (cb, db) {
 				var wsRPC = require('../api/ws/rpc/wsRPC.js').wsRPC;
 
 				wsRPC.setServer(dummyWAMPServer);
-				wsRPC.getServer().registerRPCEndpoints({status: function () {}});
-
+				wsRPC.clientsConnectionsMap = {};
 				cb();
 			}],
 			logger: function (cb) {
@@ -501,7 +504,7 @@ node.initApplication = function (cb, db) {
 				transport(transportModuleMock);
 				cb();
 			}],
-			logic: ['db', 'bus', 'schema', 'genesisblock', 'rpc', function (scope, cb) {
+			logic: ['db', 'bus', 'schema', 'genesisblock', function (scope, cb) {
 				var Transaction = require('../logic/transaction.js');
 				var Block = require('../logic/block.js');
 				var Account = require('../logic/account.js');
@@ -542,7 +545,7 @@ node.initApplication = function (cb, db) {
 					}]
 				}, cb);
 			}],
-			modules: ['network', 'webSocket', 'rpc', 'logger', 'bus', 'sequence', 'dbSequence', 'balancesSequence', 'db', 'logic', 'rpc', function (scope, cb) {
+			modules: ['network', 'webSocket', 'logger', 'bus', 'sequence', 'dbSequence', 'balancesSequence', 'db', 'logic', 'rpc', function (scope, cb) {
 				var tasks = {};
 				scope.rewiredModules = {};
 
@@ -562,7 +565,6 @@ node.initApplication = function (cb, db) {
 			ready: ['modules', 'bus', 'logic', function (scope, cb) {
 				// Fire onBind event in every module
 				scope.bus.message('bind', scope.modules);
-
 				scope.logic.peers.bindModules(scope.modules);
 				cb();
 			}]
